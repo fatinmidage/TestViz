@@ -1,26 +1,43 @@
-' 存储电池样本及其所有循环数据
-Private pBatteryID As String
-Private pCycles As Collection
+' ======================
+' 类模块：Battery
+' ======================
+Option Explicit
 
-' 初始化时创建集合
+Private pTestOrderID As String    ' 测试单号
+Private pCellSerial As String     ' 电芯序号
+Private pBarcode As String        ' 电芯条码
+Private pCycles As Collection     ' 循环数据集合
+
 Private Sub Class_Initialize()
     Set pCycles = New Collection
 End Sub
 
-' 电池编号属性
-Public Property Get BatteryID() As String
-    BatteryID = pBatteryID
+' 属性访问器
+Public Property Get TestOrderID() As String
+    TestOrderID = pTestOrderID
 End Property
-Public Property Let BatteryID(Value As String)
-    pBatteryID = Value
+Public Property Let TestOrderID(Value As String)
+    pTestOrderID = Value
 End Property
 
-' 添加循环数据
-Public Sub AddCycleData(cd As CycleData)
+Public Property Get CellSerial() As String
+    CellSerial = pCellSerial
+End Property
+Public Property Let CellSerial(Value As String)
+    pCellSerial = Value
+End Property
+
+Public Property Get Barcode() As String
+    Barcode = pBarcode
+End Property
+Public Property Let Barcode(Value As String)
+    pBarcode = Value
+End Property
+
+Public Sub AddCycle(cd As CycleData)
     pCycles.Add cd
-End Sub
+End Property
 
-' 获取循环数据集合
 Public Property Get Cycles() As Collection
     Set Cycles = pCycles
 End Property

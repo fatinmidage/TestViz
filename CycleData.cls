@@ -1,4 +1,8 @@
-' 存储单个循环周期的数据
+' ======================
+' 类模块：CycleData
+' ======================
+Option Explicit
+
 Public CycleNumber As Long
 Public DischargeCapacityAh As Double
 Public CapacityRetention As Double

@@ -10,6 +10,7 @@ Option Explicit
 ' 在模块顶部添加常量定义
 Private Const SHEET_NAME_HOME As String = "首页"
 Private Const SHEET_NAME_CYCLE_LIFE As String = "Cycle Life"
+Private Const SHEET_NAME_RPT_CYCLE_LIFE As String = "RPT of Cycle Life"
 Private Const TABLE_NAME_FILES As String = "文件名表"
 Private Const COL_NAME_FILENAME As String = "文件名"
 Private Const ERR_SHEET_NOT_FOUND As Long = 1001
@@ -24,6 +25,7 @@ Sub ProcessTestData()
     On Error GoTo ErrorHandler
     
     Dim wsCycleLife As Worksheet
+    Dim wsRptCycleLife As Worksheet
     
     ' 添加性能优化设置
     With Application
@@ -35,16 +37,33 @@ Sub ProcessTestData()
     End With
     
     ' 获取Cycle Life工作表
-    Set wsCycleLife = OpenCycleLifeWorksheet()
+    Set wsCycleLife = OpenCycleLifeWorksheet(SHEET_NAME_HOME, TABLE_NAME_FILES, SHEET_NAME_CYCLE_LIFE)
     
     If wsCycleLife Is Nothing Then
-        GoTo ExitSub
+        Err.Raise ERR_SHEET_NOT_FOUND, "ProcessTestData", "无法打开Cycle Life工作表"
+    End If
+
+    ' 获取RPT of Cycle Life工作表
+    Set wsRptCycleLife = OpenCycleLifeWorksheet(SHEET_NAME_HOME, TABLE_NAME_FILES, SHEET_NAME_RPT_CYCLE_LIFE)
+
+    If wsRptCycleLife Is Nothing Then
+        Err.Raise ERR_SHEET_NOT_FOUND, "ProcessTestData", "无法打开RPT of Cycle Life工作表"
     End If
     
-    ' TODO: 在这里添加对wsCycleLife的数据处理逻辑
+    ' 处理数据
+    Dim capacityRetentionRates As Collection
+    Set capacityRetentionRates = GetCycleData(wsCycleLife, "容量保持率/%")
+    dim energyRetentionRates As Collection
+    Set energyRetentionRates = GetCycleData(wsCycleLife, "能量保持率/%")
+    
     
     ' 完成后关闭工作簿
-    wsCycleLife.Parent.Close False
+    If Not wsCycleLife Is Nothing Then
+        wsCycleLife.Parent.Close False
+    End If
+    If Not wsRptCycleLife Is Nothing Then
+        wsRptCycleLife.Parent.Close False
+    End If
     
 ExitSub:
     ' 恢复所有设置
@@ -56,14 +75,107 @@ ExitSub:
         .StatusBar = False
     End With
     Set wsCycleLife = Nothing
+    Set wsRptCycleLife = Nothing
     Exit Sub
 
 ErrorHandler:
-    Call HandleError(Err.Number, "错误处理代码")
+    Call HandleError(Err.Number, Err.Description)
     Resume ExitSub
 End Sub
 
-Private Function OpenCycleLifeWorksheet() As Worksheet
+Private Function FindColumnByTitle(ws As Worksheet, ByVal columnTitle As String) As Long
+    ' 在第一行查找指定列
+    Dim lastCol As Long
+    Dim i As Long
+    Dim targetCol As Long
+    
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    targetCol = 0
+    
+    For i = 1 To lastCol
+        If ws.Cells(1, i).Value = columnTitle Then
+            targetCol = i
+            Exit For
+        End If
+    Next i
+    
+    FindColumnByTitle = targetCol
+End Function
+
+Private Function GetCellCount(ws As Worksheet, ByVal targetCol As Long) As Long
+    ' 检查目标列是否有效
+    If targetCol = 0 Then
+        Err.Raise ERR_INVALID_DATA_FORMAT, "GetCellCount", "无效的列号"
+    End If
+    
+    ' 检查目标列的单元格是否为合并单元格
+    Dim mergeArea As Range
+    Set mergeArea = ws.Cells(1, targetCol).MergeArea
+    Dim mergeWidth As Long
+    mergeWidth = mergeArea.Columns.Count
+    
+    ' 返回电芯数量
+    GetCellCount = mergeWidth
+End Function
+
+Private Function ExtractColumnData(ByVal ws As Worksheet, ByVal targetCol As Long, Optional ByVal startRow As Long = 4) As Double()
+    ' 获取数据行数
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, targetCol).End(xlUp).Row
+        
+    ' 如果没有数据，抛出错误
+    If lastRow < startRow Then
+        Err.Raise ERR_NO_DATA, "ExtractColumnData", "数据为空"
+        Exit Function
+    End If
+    
+    Dim dataArray As Variant
+    Dim dataRange As Range
+    Set dataRange = ws.Range(ws.Cells(startRow, targetCol), ws.Cells(lastRow, targetCol))
+    dataArray = dataRange.Value2  ' Value2比Value快15-20%
+
+    Dim resultData() As Double
+    ReDim resultData(1 To UBound(dataArray, 1))
+    
+    ' 将数据从二维数组转换为一维数组
+    Dim i As Long
+    For i = 1 To UBound(dataArray, 1)
+        resultData(i) = dataArray(i, 1)
+    Next i
+    
+    ExtractColumnData = resultData
+End Function
+
+Private Function GetCycleData(ws As Worksheet, ByVal columnTitle As String) As Collection
+    ' 获取电芯数量
+    Dim cellCount As Long
+    Dim targetCol As Long
+    
+    targetCol = FindColumnByTitle(ws, columnTitle)
+    
+    If targetCol = 0 Then
+        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessCycleLifeData", "未找到'" & columnTitle & "'列"
+    End If
+    
+    cellCount = GetCellCount(ws, targetCol)
+    
+    ' 创建一个Collection来存储处理后的数据
+    Dim result As Collection
+    Set result = New Collection
+    
+    ' 循环处理每个电芯的数据
+    Dim currentCol As Long
+    For currentCol = targetCol To targetCol + cellCount - 1
+        Dim cycleData() As Double
+        cycleData = ExtractColumnData(ws, currentCol)
+        result.Add cycleData
+    Next currentCol
+
+    Set GetCycleData = result
+End Function
+    
+
+Private Function OpenCycleLifeWorksheet(ByVal sheetName As String, ByVal tableName As String, ByVal targetSheetName As String) As Worksheet
     On Error GoTo ErrorHandler
     
     ' 添加变量声明
@@ -75,23 +187,20 @@ Private Function OpenCycleLifeWorksheet() As Worksheet
     Dim wsCycleLife As Worksheet
     
     ' 检查首页工作表是否存在
-    Set ws = ThisWorkbook.Sheets(SHEET_NAME_HOME)
+    Set ws = ThisWorkbook.Sheets(sheetName)
     If ws Is Nothing Then
-        MsgBox "未找到'" & SHEET_NAME_HOME & "'工作表!", vbExclamation
-        Exit Function
+        Err.Raise ERR_SHEET_NOT_FOUND, "OpenCycleLifeWorksheet", "未找到'" & sheetName & "'工作表"
     End If
     
     ' 检查文件名表是否存在
-    Set tblFileNames = ws.ListObjects(TABLE_NAME_FILES)
+    Set tblFileNames = ws.ListObjects(tableName)
     If tblFileNames Is Nothing Then
-        MsgBox "未找到'" & TABLE_NAME_FILES & "'列表对象!", vbExclamation
-        Exit Function
+        Err.Raise ERR_TABLE_NOT_FOUND, "OpenCycleLifeWorksheet", "未找到'" & tableName & "'列表对象"
     End If
     
     ' 检查文件名列是否存在且有数据
     If tblFileNames.ListColumns(COL_NAME_FILENAME).DataBodyRange Is Nothing Then
-        MsgBox TABLE_NAME_FILES & "中没有数据!", vbExclamation
-        Exit Function
+        Err.Raise ERR_NO_DATA, "OpenCycleLifeWorksheet", tableName & "中没有数据"
     End If
     
     ' 检查并添加文件扩展名
@@ -112,11 +221,11 @@ Private Function OpenCycleLifeWorksheet() As Worksheet
     ' 打开指定的Excel文件
     Set wb = Workbooks.Open(filePath)
     
-    ' 读取Cycle Life工作表
-    Set wsCycleLife = GetWorksheet(wb, SHEET_NAME_CYCLE_LIFE)
+    ' 读取目标工作表
+    Set wsCycleLife = GetWorksheet(wb, targetSheetName)
     
     If wsCycleLife Is Nothing Then
-        MsgBox "未找到'" & SHEET_NAME_CYCLE_LIFE & "'工作表!", vbExclamation
+        MsgBox "未找到'" & targetSheetName & "'工作表!", vbExclamation
         wb.Close False
         Exit Function
     End If
@@ -126,7 +235,10 @@ Private Function OpenCycleLifeWorksheet() As Worksheet
     Exit Function
 
 ErrorHandler:
-    Call HandleError(Err.Number, "打开Cycle Life工作表时发生错误")
+    If Not wb Is Nothing Then
+        wb.Close False
+    End If
+    Call HandleError(Err.Number, "打开" & targetSheetName & "工作表时发生错误")
     Exit Function
 End Function
 

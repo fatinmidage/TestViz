@@ -1,43 +1,39 @@
 ' ======================
 ' 类模块：Battery
 ' ======================
+' 用途：表示单个电池对象，包含电池的基本信息和循环数据
+' 属性：
+'   - CellName: 电池名称/编号
+'   - Cycles: 电池的循环数据集合
+' ======================
 Option Explicit
 
-Private pTestOrderID As String    ' 测试单号
-Private pCellSerial As String     ' 电芯序号
-Private pBarcode As String        ' 电芯条码
-Private pCycles As Collection     ' 循环数据集合
+' 私有变量声明
+Private pCellName As String        ' 存储电池名称/编号
+Private pCycles As Collection     ' 存储电池的循环数据集合
 
-Private Sub Class_Initialize()
+' 构造函数
+' 用途：初始化电池对象，创建循环数据集合
+Public Sub Class_Initialize()
     Set pCycles = New Collection
 End Sub
-
-' 属性访问器
-Public Property Get TestOrderID() As String
-    TestOrderID = pTestOrderID
+' 属性：CellName
+' 用途：获取或设置电池名称/编号
+' 参数：
+'   - value: 要设置的电池名称/编号
+Public Property Get CellName() As String
+    CellName = pCellName
 End Property
-Public Property Let TestOrderID(Value As String)
-    pTestOrderID = Value
+Public Property Let CellName(ByVal value As String)
+    pCellName = value
 End Property
-
-Public Property Get CellSerial() As String
-    CellSerial = pCellSerial
-End Property
-Public Property Let CellSerial(Value As String)
-    pCellSerial = Value
-End Property
-
-Public Property Get Barcode() As String
-    Barcode = pBarcode
-End Property
-Public Property Let Barcode(Value As String)
-    pBarcode = Value
-End Property
-
-Public Sub AddCycle(cd As CycleData)
-    pCycles.Add cd
-End Property
-
+' 属性：Cycles
+' 用途：获取或设置电池的循环数据集合
+' 参数：
+'   - value: 要设置的循环数据集合
 Public Property Get Cycles() As Collection
     Set Cycles = pCycles
+End Property
+Public Property Let Cycles(ByVal value As Collection)
+    Set pCycles = value
 End Property

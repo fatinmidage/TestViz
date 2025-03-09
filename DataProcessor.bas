@@ -13,6 +13,8 @@ Private Const SHEET_NAME_CYCLE_LIFE As String = "Cycle Life"
 Private Const SHEET_NAME_RPT_CYCLE_LIFE As String = "RPT of Cycle Life"
 Private Const TABLE_NAME_FILES As String = "文件名表"
 Private Const COL_NAME_FILENAME As String = "文件名"
+Private Const COL_NAME_CAPACITY_RETENTION As String = "容量保持率/%"
+Private Const COL_NAME_ENERGY_RETENTION As String = "能量保持率/%"
 Private Const ERR_SHEET_NOT_FOUND As Long = 1001
 Private Const ERR_TABLE_NOT_FOUND As Long = 1002
 Private Const ERR_NO_DATA As Long = 1003
@@ -24,48 +26,51 @@ Private Const ERR_INVALID_DATA_FORMAT As Long = 1007
 ' =====================
 ' 主入口函数
 ' =====================
+' 功能：处理电池测试数据，提取和分析循环寿命数据
+' 输入：无
+' 输出：无
+' 说明：
+'   1. 该函数是数据处理的主入口，负责协调整个数据处理流程
+'   2. 从Cycle Life工作表中提取容量保持率和能量保持率数据
+'   3. 包含性能优化设置，以提高大量数据处理时的效率
+'   4. 实现了完整的错误处理机制，确保异常情况下的安全退出
+' =====================
 Public Sub ProcessTestData()
     On Error GoTo ErrorHandler
     
-    Dim wsCycleLife As Worksheet
-    Dim wsRptCycleLife As Worksheet
-    
-    ' 添加性能优化设置
+    ' 声明工作簿对象，用于保存原始数据
+    Dim sourceWorkbook As Workbook
+     ' 创建新的工作表用于数据分析
+    Dim wsNewChart As Worksheet
+   
+    ' 性能优化设置部分
+    ' 以下设置用于提高大量数据处理时的性能表现
     With Application
+        ' 关闭屏幕更新以减少视觉刷新开销，可显著提升处理速度
         .ScreenUpdating = False
+        ' 关闭警告提示以避免用户交互导致的中断
         .DisplayAlerts = False
+        ' 设置为手动计算模式，避免每次单元格变更都触发公式重算
         .Calculation = xlCalculationManual
+        ' 关闭事件触发以避免不必要的事件处理开销
         .EnableEvents = False
+        ' 在状态栏显示当前处理状态，提供用户反馈
         .StatusBar = "正在处理数据..."
     End With
     
-    ' 获取Cycle Life工作表
-    Set wsCycleLife = FileUtils.OpenCycleLifeWorksheet(SHEET_NAME_HOME, TABLE_NAME_FILES, SHEET_NAME_CYCLE_LIFE)
-    
-    If wsCycleLife Is Nothing Then
-        Err.Raise ERR_SHEET_NOT_FOUND, "ProcessTestData", "无法打开Cycle Life工作表"
-    End If
-
-    ' 获取RPT of Cycle Life工作表
-    Set wsRptCycleLife = FileUtils.OpenCycleLifeWorksheet(SHEET_NAME_HOME, TABLE_NAME_FILES, SHEET_NAME_RPT_CYCLE_LIFE)
-
-    If wsRptCycleLife Is Nothing Then
-        Err.Raise ERR_SHEET_NOT_FOUND, "ProcessTestData", "无法打开RPT of Cycle Life工作表"
-    End If
-    
-    ' 处理数据
+    ' 数据获取部分
+    ' 从Cycle Life工作表中提取两类关键性能指标数据
     Dim capacityRetentionRates As Collection
-    Set capacityRetentionRates = GetCycleData(wsCycleLife, "容量保持率/%")
-    dim energyRetentionRates As Collection
-    Set energyRetentionRates = GetCycleData(wsCycleLife, "能量保持率/%")
+    Set capacityRetentionRates = GetWorksheetData(SHEET_NAME_CYCLE_LIFE, COL_NAME_CAPACITY_RETENTION, sourceWorkbook)
     
-    ' 完成后关闭工作簿
-    If Not wsCycleLife Is Nothing Then
-        wsCycleLife.Parent.Close False
+    ' 获取新的工作表对象
+    Set wsNewChart = FileUtils.CreateWorksheet(sourceWorkbook)
+    If wsNewChart Is Nothing Then
+        Err.Raise ERR_WORKBOOK_OPEN_FAILED, "ProcessTestData", "创建数据分析工作表失败"
     End If
-    If Not wsRptCycleLife Is Nothing Then
-        wsRptCycleLife.Parent.Close False
-    End If
+    
+    Dim energyRetentionRates As Collection
+    Set energyRetentionRates = GetWorksheetData(SHEET_NAME_CYCLE_LIFE, COL_NAME_ENERGY_RETENTION, sourceWorkbook)
     
 ExitSub:
     ' 恢复所有设置
@@ -76,14 +81,62 @@ ExitSub:
         .EnableEvents = True
         .StatusBar = False
     End With
-    Set wsCycleLife = Nothing
-    Set wsRptCycleLife = Nothing
     Exit Sub
 
 ErrorHandler:
     Call FileUtils.HandleError(Err.Number, Err.Description)
     Resume ExitSub
 End Sub
+
+
+' =====================
+' 工作表数据获取函数
+' =====================
+' =====================
+' 工作表数据获取函数
+' =====================
+' 功能：从指定工作表中获取特定列的数据
+' 参数：
+'   sheetName - 目标工作表名称，通常为"Cycle Life"工作表
+'   columnTitle - 要提取数据的列标题（如容量保持率或能量保持率）
+'   wb - 引用参数，返回包含目标工作表的工作簿对象
+' 返回值：
+'   Collection类型，包含从指定列提取的数据
+' 错误处理：
+'   - 如果工作表不存在，抛出ERR_SHEET_NOT_FOUND错误
+'   - 如果数据获取失败，调用FileUtils.HandleError处理错误
+' 调用关系：
+'   - 调用FileUtils.OpenCycleLifeWorksheet打开目标工作表
+'   - 调用GetCycleData获取具体的数据内容
+' =====================
+Private Function GetWorksheetData(ByVal sheetName As String, ByVal columnTitle As String, ByRef wb As Workbook) As Collection
+    On Error GoTo ErrorHandler
+    
+    ' 打开目标工作表
+    Dim ws As Worksheet
+    Set ws = FileUtils.OpenCycleLifeWorksheet(SHEET_NAME_HOME, TABLE_NAME_FILES, sheetName)
+    
+    ' 验证工作表是否成功打开
+    If ws Is Nothing Then
+        Err.Raise ERR_SHEET_NOT_FOUND, "GetWorksheetData", "无法打开" & sheetName & "工作表"
+    End If
+
+    ' 获取工作表所属的工作簿
+    Set wb = ws.Parent
+    
+    ' 从工作表中提取指定列的数据
+    Dim result As Collection
+    Set result = GetCycleData(ws, columnTitle)
+    
+    ' 返回提取的数据集合
+    Set GetWorksheetData = result
+    Exit Function
+    
+ErrorHandler:
+    Call FileUtils.HandleError(Err.Number, "获取" & sheetName & "数据时发生错误")
+    Set GetWorksheetData = Nothing
+End Function
+
 
 ' =====================
 ' 数据处理核心函数
@@ -102,6 +155,7 @@ Private Function GetCycleData(ws As Worksheet, ByVal columnTitle As String) As C
     ' 数据定位和结构分析部分
     Dim cellCount As Long
     Dim targetCol As Long
+    
     Dim result As Collection
     
     targetCol = FindColumnByTitle(ws, columnTitle)
@@ -117,8 +171,18 @@ Private Function GetCycleData(ws As Worksheet, ByVal columnTitle As String) As C
     Set result = New Collection
     
     Dim currentCol As Long
+    Dim cellName As String
+    dim battery As Battery '声明电池对象
+
+    '循环处理每一列
     For currentCol = targetCol To targetCol + cellCount - 1
-        result.Add ExtractColumnData(ws, currentCol)
+        '提取电芯名称
+        cellName = Right(ws.Cells(2, currentCol).Value, 4)
+        '创建新的电池对象
+        Set battery = New Battery
+        battery.CellName = cellName
+        battery.Cycles = ExtractColumnData(ws, currentCol)
+        result.Add battery
     Next currentCol
     
     Set GetCycleData = result
@@ -172,7 +236,8 @@ End Function
 ' =====================
 ' 列数据提取函数
 ' =====================
-Private Function ExtractColumnData(ByVal ws As Worksheet, ByVal targetCol As Long, Optional ByVal startRow As Long = 4) As Double()
+Private Function ExtractColumnData(ByVal ws As Worksheet, ByVal targetCol As Long, Optional ByVal startRow As Long = 4) As Collection
+    Dim resultData As New Collection
     ' 获取数据的最后一行
     Dim lastRow As Long
     lastRow = ws.Cells(ws.Rows.Count, targetCol).End(xlUp).Row
@@ -184,23 +249,29 @@ Private Function ExtractColumnData(ByVal ws As Worksheet, ByVal targetCol As Lon
     End If
     
     ' 一次性读取整列数据到数组
-    Dim dataArray As Variant
-    Dim dataRange As Range
-    Set dataRange = ws.Range(ws.Cells(startRow, targetCol), ws.Cells(lastRow, targetCol))
-    dataArray = dataRange.Value2
+    Dim targetDataArray As Variant
+    Dim targetDataRange As Range
+    Dim cycleDataIndexRange As Range
+    Dim cycleDataIndexArray As Variant
+    Dim cycleData As CycleData
 
-    ' 初始化结果数组
-    Dim resultData() As Double
-    ReDim resultData(1 To UBound(dataArray, 1))
+    Set targetDataRange = ws.Range(ws.Cells(startRow, targetCol), ws.Cells(lastRow, targetCol))
+    targetDataArray = targetDataRange.Value2
+
+    Set cycleDataIndexRange = ws.Range(ws.Cells(startRow, 1), ws.Cells(lastRow, 1))
+    cycleDataIndexArray = cycleDataIndexRange.Value2
     
     ' 数据转换：将Variant数组转换为Double数组
     Dim i As Long
-    For i = 1 To UBound(dataArray, 1)
-        resultData(i) = dataArray(i, 1)
+    For i = 1 To UBound(targetDataArray, 1)
+        set cycleData = New CycleData
+        cycleData.CycleNumber = cycleDataIndexArray(i, 1)
+        cycleData.CycleData = targetDataArray(i, 1)
+        resultData.Add cycleData
     Next i
     
     ' 返回处理后的数据数组
-    ExtractColumnData = resultData
+    Set ExtractColumnData = resultData
 End Function
 
 ' =====================

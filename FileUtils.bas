@@ -194,3 +194,32 @@ Public Sub UpdateProgress(ByVal progressText As String, Optional ByVal progressP
         Application.StatusBar = progressText
     End If
 End Sub 
+
+
+' =====================
+' 工作表创建函数
+' =====================
+' 功能：创建新的工作表并关闭网格线
+' 参数：
+'   wb - 工作簿对象
+' 返回值：新创建的工作表对象，失败返回Nothing
+Public Function CreateWorksheet(ByVal wb As Workbook) As Worksheet
+    On Error GoTo ErrorHandler
+    
+    ' 添加新工作表
+    Dim ws As Worksheet
+    Set ws = wb.Worksheets.Add(After:=wb.Sheets(wb.Sheets.Count))
+    ws.activate
+    
+    ' 关闭网格线
+    Application.ActiveWindow.DisplayGridlines = False
+    
+    ' 返回工作表对象
+    Set CreateWorksheet = ws
+    Exit Function
+
+ErrorHandler:
+    Call HandleError(Err.Number, "创建工作表时发生错误")
+    Set CreateWorksheet = Nothing
+End Function
+

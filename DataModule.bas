@@ -11,21 +11,21 @@ Option Explicit
 '   reportTitle - 报告标题
 ' 返回值：处理成功返回True，失败返回False
 ' =====================
-Public Function ProcessCapacityRetentionData(ByVal CycleLifeSheet As Worksheet, ByVal newWorksheet As Worksheet, ByVal columnTitle As String, ByVal reportTitle As String, ByVal batteriesInfoCollection As Collection) As Boolean
+Public Function ProcessRetentionData(ByVal CycleLifeSheet As Worksheet, ByVal newWorksheet As Worksheet, ByVal columnTitle As String, ByVal reportTitle As String, ByVal batteriesInfoCollection As Collection) As Boolean
     On Error GoTo ErrorHandler
     
     ' 获取容量保持率列
     Dim capacityRetentionCol As Long
     capacityRetentionCol = FindColumnByTitle(CycleLifeSheet, columnTitle)
     If capacityRetentionCol = 0 Then
-        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessCapacityRetentionData", "无法找到" & columnTitle & "列"
+        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessRetentionData", "无法找到" & columnTitle & "列"
     End If
     
     ' 获取电芯数量
     Dim cellCount As Long
     cellCount = GetCellCount(CycleLifeSheet, capacityRetentionCol)
     If cellCount = 0 Then
-        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessCapacityRetentionData", "无法获取电芯数量"
+        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessRetentionData", "无法获取电芯数量"
     End If
     
     ' 计算最大循环次数
@@ -83,16 +83,124 @@ Public Function ProcessCapacityRetentionData(ByVal CycleLifeSheet As Worksheet, 
     
     Set chartObj = CreateCapacityRetentionChart(newWorksheet, xRng, yRngs, axisTitle, reportTitle, batteriesInfoCollection, chartLeft, chartTop)
     If chartObj Is Nothing Then
-        ProcessCapacityRetentionData = False
+        ProcessRetentionData = False
         Exit Function
     End If
     
-    ProcessCapacityRetentionData = True
+    ProcessRetentionData = True
     Exit Function
 
 ErrorHandler:
-    Debug.Print "错误发生在ProcessCapacityRetentionData函数中: " & Err.Description
-    ProcessCapacityRetentionData = False
+    Debug.Print "错误发生在ProcessRetentionData函数中: " & Err.Description
+    ProcessRetentionData = False
+End Function
+
+' =====================
+' 中检数据处理函数
+' =====================
+' 功能：处理中检数据并创建图表
+' 参数：
+'   RPTCycleLifeSheet - RPT of Cycle Life工作表对象
+'   newWorksheet - 用于创建图表的新工作表对象
+'   recoveryRate - 恢复率列标题
+'   dcrIncreaseRate - DCR增长率列标题
+'   reportTitle - 报告标题
+' 返回值：处理成功返回True，失败返回False
+' =====================
+Public Function ProcessRPTData(ByVal RPTCycleLifeSheet As Worksheet, ByVal newWorksheet As Worksheet, ByVal recoveryRate As String, ByVal dcrIncreaseRate As String, ByVal batteriesInfoCollection As Collection) As Boolean
+    On Error GoTo ErrorHandler
+    
+    ' 获取中检数据列
+    Dim rptDataCol As Long
+    rptDataCol = FindColumnByTitle(RPTCycleLifeSheet, recoveryRate)
+    If rptDataCol = 0 Then
+        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessRPTData", "无法找到" & recoveryRate & "列"
+    End If
+    
+    ' 获取电芯数量
+    Dim cellCount As Long
+    cellCount = GetCellCount(RPTCycleLifeSheet, rptDataCol)
+    If cellCount = 0 Then
+        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessRPTData", "无法获取电芯数量"
+    End If
+    
+    ' 计算最大中检次数
+    Dim maxRPTCount As Long
+    maxRPTCount = 0
+    
+    ' 遍历每一列，找出最大的有效数据行数
+    Dim currentCol As Long
+    For currentCol = rptDataCol To rptDataCol + cellCount - 1
+        Dim currentLastRow As Long
+        currentLastRow = RPTCycleLifeSheet.Cells(RPTCycleLifeSheet.Rows.Count, currentCol).End(xlUp).Row - 3 ' 减去表头行数
+        If currentLastRow > maxRPTCount Then
+            maxRPTCount = currentLastRow
+        End If
+    Next currentCol
+
+    ' 准备数据范围
+    Dim xRng As Range
+    Set xRng = RPTCycleLifeSheet.Range(RPTCycleLifeSheet.Cells(4, 1), RPTCycleLifeSheet.Cells(maxRPTCount + 3, 1))
+    Dim yRngs As Collection
+    Set yRngs = New Collection
+    
+    ' 遍历每一列，添加中检数据范围
+    For currentCol = rptDataCol To rptDataCol + cellCount - 1
+        Dim yRng As Range
+        Set yRng = RPTCycleLifeSheet.Range(RPTCycleLifeSheet.Cells(4, currentCol), RPTCycleLifeSheet.Cells(maxRPTCount + 3, currentCol))
+        yRngs.Add yRng
+    Next currentCol
+    
+    ' 准备DCR增长率数据范围
+    Dim dcrDataCol As Long
+    dcrDataCol = FindColumnByTitle(RPTCycleLifeSheet, dcrIncreaseRate)
+    If dcrDataCol = 0 Then
+        Err.Raise ERR_INVALID_DATA_FORMAT, "ProcessRPTData", "无法找到" & dcrIncreaseRate & "列"
+    End If
+    
+    Dim dcrYRngs As Collection
+    Set dcrYRngs = New Collection
+    
+    ' 遍历每一列，添加DCR增长率数据范围
+    For currentCol = dcrDataCol To dcrDataCol + cellCount - 1
+        Dim dcrYRng As Range
+        Set dcrYRng = RPTCycleLifeSheet.Range(RPTCycleLifeSheet.Cells(4, currentCol), RPTCycleLifeSheet.Cells(maxRPTCount + 3, currentCol))
+        dcrYRngs.Add dcrYRng
+    Next currentCol
+
+    ' 创建图表
+    Dim chartObj As ChartObject
+    Dim chartLeft As Long
+    Dim chartTop As Long
+    
+    ' 根据recoveryRate参数设置图表位置
+    If recoveryRate = "容量保持率/%" Then
+        chartLeft = 50
+        chartTop = 400 ' 容量恢复率图表位置
+    ElseIf recoveryRate = "能量保持率/%" Then
+        chartLeft = 550
+        chartTop = 400 ' 能量恢复率图表位置
+    Else
+        chartLeft = 50
+        chartTop = 400 ' 默认图表位置
+    End If
+    
+    ' 设置Y轴标题
+    Dim axisTitle As String
+    axisTitle = recoveryRate
+    
+    Set chartObj = CreateRPTRetentionChart(newWorksheet, xRng, yRngs, dcrYRngs, recoveryRate, batteriesInfoCollection, chartLeft, chartTop)
+    If chartObj Is Nothing Then
+        ProcessRPTData = False
+        Exit Function
+    End If
+    
+    ProcessRPTData = True
+    Exit Function
+
+ErrorHandler:
+    Debug.Print "错误发生在ProcessRPTData函数中: " & Err.Description
+    ProcessRPTData = False
 End Function
 
 ' =====================
@@ -128,9 +236,15 @@ Public Function FindColumnByTitle(ws As Worksheet, ByVal columnTitle As String) 
     ' SearchOrder - 按列搜索（xlByColumns）
     ' MatchCase - 不区分大小写（False）
     Dim foundCell As Range
+    Dim lookAtValue as XlLookAt
+    If columnTitle = "DCIR增长率/%" Then
+        lookAtValue = xlPart
+    Else
+        lookAtValue = xlWhole
+    End If
     Set foundCell = ws.Rows(1).Find(What:=columnTitle, _
                                   LookIn:=xlValues, _
-                                  LookAt:=xlWhole, _
+                                  LookAt:=lookAtValue, _
                                   SearchOrder:=xlByColumns, _
                                   MatchCase:=False)
     
@@ -221,3 +335,4 @@ ErrorHandler:
     Call HandleError(Err.Number, "创建工作表时发生错误")
     Set CreateWorksheet = Nothing
 End Function
+

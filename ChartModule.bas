@@ -25,7 +25,7 @@ Public Const COLOR_GRIDLINE As Long = &HBFBFBF '网格线颜色（浅灰色，RG
 '   yRngs - Y轴数据范围集合（容量保持率）
 ' 返回值：创建的图表对象，失败返回Nothing
 ' =====================
-Public Function CreateCapacityRetentionChart(ByVal ws As Worksheet, ByVal xRng As Range, ByVal yRngs As Collection, ByVal yAxisTitle As String, ByVal reportName As String, ByVal batteriesInfoCollection As Collection, Optional ByVal leftParam As Long = 50, Optional ByVal topParam As Long = 50) As ChartObject
+Public Function CreateCapacityRetentionChart(ByVal ws As Worksheet, ByVal xRng As Range, ByVal yRngs As Collection, ByVal yAxisTitle As String, ByVal reportName As String, ByVal batteriesInfoCollection As Collection, ByVal leftParam As Long, ByVal topParam As Long, Optional ByVal dcrYRngs As Collection = Nothing) As ChartObject
     On Error GoTo ErrorHandler
     
     ' 创建散点图
@@ -46,6 +46,28 @@ Public Function CreateCapacityRetentionChart(ByVal ws As Worksheet, ByVal xRng A
                 .Format.Line.ForeColor.RGB = batteriesInfoCollection(i).BatteryColor
             End With
         Next i
+        
+        ' 添加DCR增长率数据系列（如果有）
+        If Not dcrYRngs Is Nothing Then
+            For i = 1 To dcrYRngs.Count
+                With .SeriesCollection.NewSeries
+                    .XValues = xRng
+                    .Values = dcrYRngs(i)
+                    .Name = "DCR #" & i
+                    .MarkerStyle = xlMarkerStyleNone
+                    .Format.Line.ForeColor.RGB = batteriesInfoCollection(i).BatteryColor
+                    .AxisGroup = xlSecondary
+                End With
+            Next i
+            
+            ' 设置次坐标轴属性
+            With .Axes(xlValue, xlSecondary)
+                .HasTitle = True
+                .AxisTitle.Text = "DCR增长率/%"
+                .HasMajorGridlines = False
+                .HasMinorGridlines = False
+            End With
+        End If
 
         SetupChartGridlines chartObj.Chart
 

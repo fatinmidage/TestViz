@@ -21,6 +21,7 @@ Public Sub Main()
     ' 声明变量
     Dim originDataWorkbook As Workbook
     Dim CycleLifeSheet As Worksheet
+    Dim RPTCycleLifeSheet As Worksheet
     Dim newWorksheet As Worksheet
     Dim reportTitle As String
     reportTitle = GetFileNameFromTable(COL_NAME_REPORTNAME)
@@ -39,6 +40,15 @@ Public Sub Main()
     Set CycleLifeSheet = originDataWorkbook.Worksheets(SHEET_NAME_CYCLE_LIFE)
     If CycleLifeSheet Is Nothing Then
         MsgBox "无法获取" & SHEET_NAME_CYCLE_LIFE & "工作表", vbCritical
+    End If
+
+    '获取并验证RPT of Cycle Life工作表
+    Set RPTCycleLifeSheet = originDataWorkbook.Worksheets(SHEET_NAME_RPT_CYCLE_LIFE)
+    If RPTCycleLifeSheet Is Nothing Then
+        MsgBox "无法获取" & SHEET_NAME_RPT_CYCLE_LIFE & "工作表", vbCritical
+    End If
+    
+    If CycleLifeSheet Is Nothing And RPTCycleLifeSheet Is Nothing Then
         GoTo ExitSub
     End If
     
@@ -48,14 +58,30 @@ Public Sub Main()
         GoTo ExitSub
     End If
     
-    ' 处理容量保持率数据并创建图表
-    If Not ProcessCapacityRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_CAPACITY_RETENTION, reportTitle, batteriesInfoCollection) Then
-        GoTo ExitSub
+    ' 处理Cycle Life工作表数据
+    If Not CycleLifeSheet Is Nothing Then
+        ' 处理容量保持率数据并创建图表
+        If Not ProcessRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_CAPACITY_RETENTION, reportTitle, batteriesInfoCollection) Then
+            MsgBox "处理容量保持率数据时发生错误", vbExclamation
+        End If
+        
+        ' 处理能量保持率数据并创建图表
+        If Not ProcessRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_ENERGY_RETENTION, reportTitle, batteriesInfoCollection) Then
+            MsgBox "处理能量保持率数据时发生错误", vbExclamation
+        End If
     End If
     
-    ' 处理能量保持率数据并创建图表
-    If Not ProcessCapacityRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_ENERGY_RETENTION, reportTitle, batteriesInfoCollection) Then
-        GoTo ExitSub
+    ' 处理RPT of Cycle Life工作表数据
+    If Not RPTCycleLifeSheet Is Nothing Then
+       '处理容量保持率数据并创建图表
+        If Not ProcessRPTData(RPTCycleLifeSheet, newWorksheet, COL_NAME_CAPACITY_RETENTION, "DCIR增长率/%", batteriesInfoCollection) Then
+            MsgBox "处理容量保持率数据时发生错误", vbExclamation
+        End If
+
+       '处理能量保持率数据并创建图表
+        If Not ProcessRPTData(RPTCycleLifeSheet, newWorksheet, COL_NAME_ENERGY_RETENTION, "DCIR增长率/%", batteriesInfoCollection) Then
+            MsgBox "处理能量保持率数据时发生错误", vbExclamation
+        End If
     End If
     
     ' 正常退出

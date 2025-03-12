@@ -11,7 +11,7 @@ Option Explicit
 '   reportTitle - 报告标题
 ' 返回值：处理成功返回True，失败返回False
 ' =====================
-Public Function ProcessCapacityRetentionData(ByVal CycleLifeSheet As Worksheet, ByVal newWorksheet As Worksheet, ByVal columnTitle As String, ByVal reportTitle As String) As Boolean
+Public Function ProcessCapacityRetentionData(ByVal CycleLifeSheet As Worksheet, ByVal newWorksheet As Worksheet, ByVal columnTitle As String, ByVal reportTitle As String, ByVal batteriesInfoCollection As Collection) As Boolean
     On Error GoTo ErrorHandler
     
     ' 获取容量保持率列
@@ -81,7 +81,7 @@ Public Function ProcessCapacityRetentionData(ByVal CycleLifeSheet As Worksheet, 
         axisTitle = columnTitle
     End If
     
-    Set chartObj = CreateCapacityRetentionChart(newWorksheet, xRng, yRngs, axisTitle, reportTitle, chartLeft, chartTop)
+    Set chartObj = CreateCapacityRetentionChart(newWorksheet, xRng, yRngs, axisTitle, reportTitle, batteriesInfoCollection, chartLeft, chartTop)
     If chartObj Is Nothing Then
         ProcessCapacityRetentionData = False
         Exit Function
@@ -220,4 +220,4 @@ Public Function CreateWorksheet(ByVal wb As Workbook) As Worksheet
 ErrorHandler:
     Call HandleError(Err.Number, "创建工作表时发生错误")
     Set CreateWorksheet = Nothing
-End Function 
+End Function

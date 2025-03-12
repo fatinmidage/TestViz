@@ -49,12 +49,12 @@ Public Sub Main()
     End If
     
     ' 处理容量保持率数据并创建图表
-    If Not ProcessCapacityRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_CAPACITY_RETENTION, reportTitle) Then
+    If Not ProcessCapacityRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_CAPACITY_RETENTION, reportTitle, batteriesInfoCollection) Then
         GoTo ExitSub
     End If
     
     ' 处理能量保持率数据并创建图表
-    If Not ProcessCapacityRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_ENERGY_RETENTION, reportTitle) Then
+    If Not ProcessCapacityRetentionData(CycleLifeSheet, newWorksheet, COL_NAME_ENERGY_RETENTION, reportTitle, batteriesInfoCollection) Then
         GoTo ExitSub
     End If
     

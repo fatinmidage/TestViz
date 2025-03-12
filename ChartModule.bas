@@ -25,7 +25,7 @@ Public Const COLOR_GRIDLINE As Long = &HBFBFBF '网格线颜色（浅灰色，RG
 '   yRngs - Y轴数据范围集合（容量保持率）
 ' 返回值：创建的图表对象，失败返回Nothing
 ' =====================
-Public Function CreateCapacityRetentionChart(ByVal ws As Worksheet, ByVal xRng As Range, ByVal yRngs As Collection, ByVal yAxisTitle As String, ByVal reportName As String, Optional ByVal leftParam As Long = 50, Optional ByVal topParam As Long = 50) As ChartObject
+Public Function CreateCapacityRetentionChart(ByVal ws As Worksheet, ByVal xRng As Range, ByVal yRngs As Collection, ByVal yAxisTitle As String, ByVal reportName As String, ByVal batteriesInfoCollection As Collection, Optional ByVal leftParam As Long = 50, Optional ByVal topParam As Long = 50) As ChartObject
     On Error GoTo ErrorHandler
     
     ' 创建散点图
@@ -41,8 +41,9 @@ Public Function CreateCapacityRetentionChart(ByVal ws As Worksheet, ByVal xRng A
             With .SeriesCollection.NewSeries
                 .XValues = xRng
                 .Values = yRngs(i)
-                .Name = "电芯" & i
+                .Name = IIf(Len(Trim(batteriesInfoCollection(i).BatteryName)) = 0, "Cell #" & i, batteriesInfoCollection(i).BatteryName)
                 .MarkerStyle = xlMarkerStyleNone
+                .Format.Line.ForeColor.RGB = batteriesInfoCollection(i).BatteryColor
             End With
         Next i
 
@@ -197,4 +198,4 @@ Public Sub SetupChartTitle(ByVal cht As chart, ByVal titleText As String)
         .ChartTitle.Font.Size = 14
         .ChartTitle.Font.Name = "Times New Roman"
     End With
-End Sub 
+End Sub

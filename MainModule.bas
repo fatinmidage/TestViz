@@ -25,6 +25,9 @@ Public Sub Main()
     Dim reportTitle As String
     reportTitle = GetFileNameFromTable(COL_NAME_REPORTNAME)
     
+    ' 获取电池信息集合
+    Dim batteriesInfoCollection As Collection
+    Set batteriesInfoCollection = GetBatteriesInfo("电池名字颜色")
     
     ' 打开数据工作簿
     Set originDataWorkbook = OpenWorkbookFromTable()
@@ -76,7 +79,11 @@ Public Sub SetPerformanceMode(ByVal enable As Boolean)
     With Application
         .ScreenUpdating = Not enable
         .DisplayAlerts = Not enable
-        .Calculation = IIf(enable, xlCalculationManual, xlCalculationAutomatic)
+        If enable Then
+            .Calculation = xlCalculationManual
+        Else
+            .Calculation = xlCalculationAutomatic
+        End If
         .EnableEvents = Not enable
         If enable Then
             .StatusBar = "正在处理数据..."
@@ -84,4 +91,55 @@ Public Sub SetPerformanceMode(ByVal enable As Boolean)
             .StatusBar = False
         End If
     End With
-End Sub 
+End Sub
+
+'******************************************
+' 函数: GetBatteriesInfo
+' 用途: 从指定表格中读取电池信息
+' 参数:
+'   tableName - 电池信息表的名称
+' 返回值: 包含BatteryInfo对象的Collection集合
+'******************************************
+Private Function GetBatteriesInfo(ByVal tableName As String) As Collection
+    On Error GoTo ErrorHandler
+    
+    ' 初始化返回值
+    Dim batteriesInfoCollection As Collection
+    Set batteriesInfoCollection = New Collection
+    
+    ' 获取电池信息表
+    Dim batteriesInfoTable As ListObject
+    Set batteriesInfoTable = GetTableByName(tableName)
+    
+    ' 验证表格是否存在且有数据
+    If Not batteriesInfoTable Is Nothing Then
+        If Not batteriesInfoTable.DataBodyRange Is Nothing Then
+            ' 遍历表格中的每一行
+            Dim row As ListRow
+            Dim batteryInfo As BatteryInfo
+            
+            For Each row In batteriesInfoTable.ListRows
+                ' 创建新的BatteryInfo对象
+                Set batteryInfo = New BatteryInfo
+                
+                ' 获取电池名称和颜色
+                batteryInfo.BatteryName = row.Range.Cells(1, row.Parent.ListColumns("名字").Index).Value
+                batteryInfo.BatteryColor = row.Range.Cells(1, row.Parent.ListColumns("颜色").Index).Interior.Color
+                
+                ' 将BatteryInfo对象添加到集合中
+                batteriesInfoCollection.Add batteryInfo
+            Next row
+        Else
+            Debug.Print "电池名字颜色表没有数据"
+        End If
+    Else
+        Debug.Print "未找到电池名字颜色表"
+    End If
+    
+    Set GetBatteriesInfo = batteriesInfoCollection
+    Exit Function
+
+ErrorHandler:
+    Set GetBatteriesInfo = New Collection
+    Debug.Print "获取电池信息时发生错误: " & Err.Description
+End Function

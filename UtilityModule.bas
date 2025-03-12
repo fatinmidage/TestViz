@@ -1,6 +1,40 @@
 Option Explicit
 
 '******************************************
+' 函数: GetTableByName
+' 用途: 从当前工作表获取文件名表
+' 参数:
+'   tableName - 要获取的表格名称
+' 返回值: 成功返回ListObject对象，失败抛出错误
+'******************************************
+Public Function GetTableByName(ByVal tableName As String) As ListObject
+    On Error GoTo ErrorHandler
+    
+    ' 获取文件名表
+    Dim tblFileNames As ListObject
+    Dim atws As Worksheet
+    Set atws = ActiveSheet
+    
+    ' 参数验证
+    ' 检查当前工作表是否可用
+    If atws Is Nothing Then
+        Err.Raise ERR_INVALID_DATA_FORMAT, "GetTableByName", "无法获取当前工作表"
+    End If
+    
+    ' 获取并验证文件名表是否存在
+    Set tblFileNames = atws.ListObjects(tableName)
+    If tblFileNames Is Nothing Then
+        Err.Raise ERR_TABLE_NOT_FOUND, "GetTableByName", "未找到'" & tableName & "'表格"
+    End If
+    
+    Set GetTableByName = tblFileNames
+    Exit Function
+
+ErrorHandler:
+    Err.Raise Err.Number, "GetTableByName", Err.Description
+End Function
+
+'******************************************
 ' 函数: GetFileNameFromTable
 ' 用途: 从指定的表格中获取文件名
 ' 参数:
@@ -12,20 +46,7 @@ Public Function GetFileNameFromTable(ByVal columnName As String) As String
     
     ' 获取文件名表
     Dim tblFileNames As ListObject
-    Dim atws As Worksheet
-    Set atws = ActiveSheet
-    
-    ' 参数验证
-    ' 检查当前工作表是否可用
-    If atws Is Nothing Then
-        Err.Raise ERR_INVALID_DATA_FORMAT, "GetFileNameFromTable", "无法获取当前工作表"
-    End If
-    
-    ' 获取并验证文件名表是否存在
-    Set tblFileNames = atws.ListObjects(TABLE_NAME_FILES)
-    If tblFileNames Is Nothing Then
-        Err.Raise ERR_TABLE_NOT_FOUND, "GetFileNameFromTable", "未找到'" & TABLE_NAME_FILES & "'表格"
-    End If
+    Set tblFileNames = GetTableByName(TABLE_NAME_FILES)
     
     ' 验证文件名列是否存在且有数据
     ' 获取文件名列对象
@@ -132,4 +153,4 @@ Public Function FileExists(ByVal filePath As String) As Boolean
     On Error Resume Next
     FileExists = (Dir(filePath) <> "")
     On Error GoTo 0
-End Function 
+End Function
